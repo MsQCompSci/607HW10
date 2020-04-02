@@ -1,0 +1,438 @@
+---
+title: <center>'Sentiment Analysis - Data 606 Week 10'</center>
+author: <center>Layla Quinones</center>
+date: <center>4/1/2020</center>
+output:
+  html_document:
+    df_print: paged
+    toc: yes
+    toc_collapsed: yes
+    toc_depth: 3
+    toc_float: yes
+---
+
+```{r, echo = FALSE, include = FALSE, results = 'hide', warning = FALSE}
+library(tidyverse)
+library(genius)
+library(tidytext)
+library(Stack)
+library(wordcloud)
+library(kableExtra)
+```
+
+<style type = "text/css">
+
+h1 {color: blue; font-weight: bold;font-family: Georgia, serif;}
+h2 {text-shadow: -2px -2px lightblue;font-family: Georgia, serif;}
+</style>
+
+# Introduction
+
+```{r, out.width = "30%", fig.align="center", echo = FALSE}
+knitr::include_graphics("https://images-na.ssl-images-amazon.com/images/I/91oiH6snQHL._SL1500_.jpg")
+```
+
+NF is one of my favorite rap artists. He draws a lot of inspiration from his rough past and insecurities, but his narrative is driven and forward thinking, often looking to the future for hope for a better present. I was interested in implementing some of the ideas taught in Chapter 2 of - [Text Mining with R](https://www.tidytextmining.com/sentiment.html) on the lyrics from his album *Perception*.
+
+In order to classify the words that NF chooses to use in his album I chose the following lexicons to explore sentiment:<br>
+
+<ul>
+<li>`nrc`: lexicon that classifies words and their associations with emotions (anger, fear, anticipation, trust, surprise, sadness, joy, and disgust) and two sentiments (negative and positive). </li>
+<li>`bing`: lexicon that classifies words as either associated with negative and positive sentiments</li>
+</ul>
+
+The lyrics to NF's album *Perception* was accessed using the `genius` library which alloows us access to a corpus of lyrics by album, artist, song title, etc.
+
+Other libraries used in this presentation: `tidyverse`, `wordcloud`, `Stack`, and `kableExtra`
+<br>
+<br>
+
+<center>
+**General question explored throughout this presentation:**<br>
+**What is the sentiment of NF's album *Perception*?**
+</center>
+<br>
+
+## Load corpus and lexicon
+
+First we need to load up the corpus and lexicon. <br>
+
+<ol>
+<li>Using the `genius_album()` function from the `genius` library we can load lyrics by artist and album. </li>
+<li>Using the `get_sentiments()` function from the `genius` library we can access the `nrc` lexicon contained in the `tidyverse` package.</li>
+</ol>
+
+```{r, message = FALSE}
+# get all the lyrics from NF's album Perception
+nf_percep <- genius_album(artist = "NF", album = "Perception")
+
+#Display Corpus
+kable(nf_percep) %>%
+  kable_styling() %>%
+  scroll_box(width = "100%", height = "200px")
+
+#Display NRC lexicon
+kable(get_sentiments("nrc")) %>%
+  kable_styling()%>%
+  scroll_box(width = "100%", height = "200px")
+```
+
+## Convert to tidy format
+
+One of the key characteristics of a tidy data set is one that has *one observation per row*. This translates into seperating the `lyric` column of the `nf_percp` dataframe into individual words. We achieve this by using the `unnest_tokens()`function.
+
+```{r , message = FALSE}
+#Remove stop words from the lyric column
+nf_percep_words <- nf_percep %>%
+  unnest_tokens(word,lyric)
+
+#Display Corpus
+kable(nf_percep_words) %>%
+  kable_styling() %>%
+  scroll_box(width = "100%", height = "200px")
+```
+
+<br>
+
+As we can see here, the `lyric` column has been transformed into a `word` column with track numbers and line numbers preserved.
+
+# Inner - Join with NRC
+
+The following steps were modified from Section 2.2 of - [Text Mining with R](https://www.tidytextmining.com/sentiment.html#sentiment-analysis-with-inner-join)
+
+
+## **Question One:** <br>
+<center>
+**What are the most common "joyful" words in the NF album *Perception* ?**
+</center>
+
+<br>
+<br>
+
+This question was answered using the `nrc` lexicon's `joy` classification. 
+
+<ol>
+<li>Use `get_sentiments()` to call `nrc` lexicon</li>
+
+<li>Use `filter()` to select only "joy" words </li>
+
+<li>Use `inner_join()` to perform sentiment analysis with NF album words </li>
+
+<li>Use `count` to calculate the number of times each word appears in the corpus. This creates a new dataframe with two columns: `word` specific word of interest and `n` number of times it appears in corpus</li>
+
+<li> Visualize joy words and frequency using `ggplot` and `geom_col()` to create a bar chart</li>
+</ol>
+```{r, message = FALSE, , fig.align = "center"}
+nrc_joy <- get_sentiments("nrc") %>% 
+  filter(sentiment == "joy")
+
+nf_percep_joy <- nf_percep_words %>%
+  inner_join(nrc_joy) %>%
+  count(word, sort = TRUE)
+
+kable(nf_percep_joy) %>%
+  kable_styling() %>%
+  scroll_box(width = "100%", height = "200px")
+
+ggplot(nf_percep_joy) +
+  geom_col(aes(x = reorder(word, n), y = n), color = 'blue', fill = 'yellow')+
+  labs(title = "Joy Words in NF's Perception", x = 'Joy Word', y = 'frequency') +
+  theme(plot.title = element_text(hjust = 0.5), axis.text.y = element_text(size = 5)) +
+  coord_flip()
+```
+
+As we can see from the above visual the answer to our question is: <br>
+The most common "joyful" words in NF's album *Perception* is *love*, *green*, *good*, *music* and *baby*. 
+
+## **Question Two:** <br>
+<center>
+**How do the line distributions between "joyful" and "angry" words in the NF album *Perception* compare?**
+</center>
+
+<br>
+<br>
+
+We can use the dataframe with the "joy" words `nf_percep_joy` and can cross reference the line number that those words appear in. We can also do this for "anger" words and compare their locations within songs by plotting histograms with line number and the corresponding number of "joy" or "anger" words found in that line across songs. 
+
+<ol>
+<li>We then use `filter()` on the words in the album `nf_percep_Words` and keep only words that appear in the `nf_percep_joy` dataframe created above.</li>
+
+<li>Create a contingency table for the number of joy words that appear in each line for each song on the album using the R base function `table()`</li>
+
+<li>Repeat for *anger* words (completing steps to isolate "anger" words as shown above)</li>
+</ol>
+
+```{r, message = FALSE, fig.align = "center"}
+#Select only rows that have joy words listed in nf_percep_joy
+joy <- nf_percep_words %>% 
+  filter(nf_percep_words$word %in% nf_percep_joy$word)
+
+#Plot in a histogram
+ggplot(joy) +
+  geom_histogram(aes(x = line), bins = length(nf_percep_joy$word), color = 'Black', fill = 'yellow')+
+  labs(title = "Joyful Words in NF's Perception", x = 'Line Number') +
+  theme(plot.title = element_text(hjust = 0.5))
+
+#Lets similarly look at anger (complete steps from last section)
+nrc_anger <- get_sentiments("nrc") %>% 
+  filter(sentiment == "anger")
+
+nf_percep_anger <- nf_percep_words %>%
+  inner_join(nrc_anger) %>%
+  count(word, sort = TRUE)
+
+anger <- nf_percep_words %>% filter(nf_percep_words$word %in% nf_percep_anger$word)
+
+ggplot(anger) +
+  geom_histogram(aes(x = line), bins = length(nf_percep_anger$word), color = "black", fill = 'red')+
+  labs(title = "Angry Words in NF's Perception", x = 'Line Number') +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+Here we can start to see NF's preferences for using joyful lyrics rather than angry lyrics. Lets look at this idea of "good" and "bad" sentiments by comparing negative and positive sentiments more generally.
+
+# Inner - Join with Bing
+
+## **Question Three:** <br>
+<center>
+**How do the number of overall negative and positive sentiments compare in this album?**
+</center>
+
+<br>
+<br>
+
+In order to directly compare negative and positive sentiments we use the `bing` lexicon of words that are classfied in a binary fashion (`negative` vs. `positive`). This will enable us to calculate a difference and visualize exactly the difference between words in either category by line, by song, etc. This code is modified from Section 2.2 of - [Text Mining with R](https://www.tidytextmining.com/sentiment.html#sentiment-analysis-with-inner-join). To answer this question we do the following:
+
+<ol>
+<li>Use `get_sentiments()` to call `bing` lexicon and use it in  `inner_join()` to perform sentiment analysis with NF album words </li>
+
+<li>Use `filter` to filter out the `negative` sentiments</li>
+
+<li>Select only rows that have `negative` words listed in `nf_percep_words` dataframe and add a new row labeled the `sentiment`</li>
+
+<li>Repeat to isolate `positive` words
+
+<li>Create a composite dataframe by stacking the two created above for positive and negative words using `Stack()`</li>
+
+<li>Visualize both line distributions in a histogram </li>
+</ol>
+
+```{r,message = FALSE , fig.align = "center"}
+nf_percep_bing <- nf_percep_words %>%
+  inner_join(get_sentiments('bing')) 
+
+nf_bing_neg <- nf_percep_bing %>%
+  filter(sentiment == "negative")
+
+neg <- nf_percep_words %>% 
+  filter(nf_percep_words$word %in% nf_bing_neg$word) %>%
+  mutate(sentiment = 'neg')
+
+#Same above for positive
+nf_bing_pos <- nf_percep_bing %>%
+  filter(sentiment == "positive")
+
+pos <- nf_percep_words %>% 
+  filter(nf_percep_words$word %in% nf_bing_pos$word) %>%
+  mutate(sentiment = 'pos')
+
+posNeg <- Stack(neg,pos)
+
+#Plot in a histogram
+ggplot(posNeg, aes(x = line, color = sentiment, fill = sentiment)) +
+  geom_histogram(position = "identity", bins = mean(posNeg$line),alpha=0.3)+
+  labs(title = "Negative & Positive Words in NF's Perception", x = 'Line Number') +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+From this histogram its easy to see that NF uses more `positive` words than negative words in his lyrics. However, when analyzing musical lyrics its important to note that lyrics is actually a form of creative writing and expression, therefore and understanding of the underlying meaning behind words is very important when interpreting the sentiment of rap music.
+
+Lets take the difference and plot that:
+
+<ol>
+<li>Create contingency tables for the line distributions for `negative` and `positive` words, and add a row with their gategory (`neg` or `pos`)</li>
+
+<li>Stack them using`Stack()`</li>
+
+<li>Call `spread()` on the composite dataframe so that `neg` and `pos` categories are in seperate columns</li>
+
+<li>Take the difference between `neg` and `pos` and save the difference in a new column</li>
+
+<li>Plot the differences by line number in a bar chart</li>
+</ol>
+
+```{r, fig.align = 'center', warning = FALSE, message = FALSE}
+negLine <- as.data.frame(table(neg$line)) %>%
+  mutate(sent = 'neg')
+
+posLine <- as.data.frame(table(pos$line)) %>%
+  mutate(sent = 'pos')
+
+d <- Stack(posLine,negLine)
+
+d <- d %>%
+  spread(sent, Freq, fill = 0) %>%
+  mutate(diff = pos-neg)
+
+ggplot(d) +
+  geom_col(aes(x = Var1, y = diff), fill = 'lightblue') +
+  theme(text = element_text(size=10), axis.text.x = element_text(size = 2), plot.title = element_text(hjust = 0.5)) +
+  labs(title = "Difference in number of Negative and Positive Words", x = "Line Number", y = "Positive - Negative Words")
+```
+
+Plotting the differences here makes it easier to see and interpret that the majority of differences between the number of positive and the number of negative words in each line is positive. Therefore, there are more positive sentiments than negative sentiment in this album. It's also cool to note that at the end of NF's songs there are typically more negative words than in the beggining and middle. 
+
+## **Question Four:** <br>
+<center>
+**What are the the top positive and negative words in this album?**
+</center>
+
+<br>
+<br>
+
+By lookiong closer at the types of words that popping up in this album, we can rank the positive and negative songs NF chooses to use and visualize them, in hopes to unlock some insight into specific words. Code in this section is modified from [Text Mining with R Section 2.4](https://www.tidytextmining.com/sentiment.html#most-positive-negative). To achive this the following can be done:<br>
+
+<ol>
+<li>Use `count()` on the `word`and `sentiment` columns in `nf_percep_bing` dataframe to count the number of times each word appears in the corpus </li>
+<li>Sort by sentiment with `group_by()` </li>
+<li>Select only the top 10 by calling `top_n()` and ungroup so we can arrange in descending order</li>
+<li>Plot side by side in bar graphs using `geom_col()` and `facet_wrap()`</li>
+</ol>
+
+```{r, message = FALSE, , fig.align = "center"}
+topNeg <- nf_percep_bing %>%
+  count(word, sentiment, sort = TRUE)
+
+topNeg %>%
+  group_by(sentiment) %>%
+  top_n(10) %>%
+  ungroup() %>%
+  mutate(word = reorder(word, n)) %>%
+  
+ggplot(aes(word, n, fill = sentiment)) +
+  geom_col(show.legend = FALSE) +
+  facet_wrap(~sentiment, scales = "free_y") +
+  labs(y = "Contribution to sentiment",
+       x = NULL) +
+  coord_flip()
+```
+
+It is not surprising that the word that appears most in the album is "like". This also begs the question "How many of those 'likes' preceded negative words? Would those be considered negative.
+
+These are precisly the types of nuances that approaches such as n-grams and tf-idf try to address, 
+
+# Wordmaps
+
+Code in this section is modified from [Text Mining with R Section 2.5](https://www.tidytextmining.com/sentiment.html#wordclouds)
+
+Using the wordcloud library we can create a visual that arranges the size of the words to reflect it's reletive frequency in the album. To do this we:<br>
+
+<ol>
+<li>From the tidy data call `anti_join()`on `stop_words` - we know that there are common words that have no meaning in this context (the, is, etc). These are conveniently saved in a dataframe called `stop_words`. This step removes those words from our data set </li>
+<li>Call `count` on the `word` column to count the number of times each appears</li>
+<li>Call `wordcloud` on the `word` column using `n` to scale the size</li>
+</ol>
+
+```{r, fig.align = "center", message = FALSE}
+
+  nf_percep_words %>%
+  anti_join(stop_words) %>%
+  count(word) %>%
+  with(wordcloud(word, n, max.words = 200, random.order=FALSE, rot.per=0.35, 
+          colors=brewer.pal(8, "Set1")))
+
+```
+
+With this visual we can see some common themes and trends with frequent words. It seems with these results NF raps alot about life, celebration/affirmation (often using "yeah"), and hope.
+
+# Term Frequency (TF)
+
+Code in this section is modified from [Text Mining with R Section 3.1](https://www.tidytextmining.com/tfidf.html#term-frequency-in-jane-austens-novels)
+The term frequency (**TF**) referrs to the number of times a term appears in a collection of documents. Let take a look at the various term frequencies for words in this album. To calculate and visualize various term frequencies for eafch track we:
+
+<ol>
+<li>Count the number of times each word is used in a track using `count()`</li>
+<li>Count the total number of  words in each track</li>
+<li> Use `left_join()` to create a composite dataframe with the document frequency and term frequency</li>
+<li> Visualize each term frequency by the song number</li>
+</ol>
+
+```{r, message = FALSE, fig.height=25}
+
+#Total number of words in wach track
+track_words <- nf_percep_words %>% 
+  count(track_n, word, sort = TRUE)
+#Display 
+kable(track_words)%>%
+  kable_styling() %>%
+  scroll_box(width = "100%", height = "200px")
+
+
+#Total number of words in each track
+total_words <-  track_words %>%
+  group_by(track_n) %>% 
+  summarize(total = sum(n))
+
+kable(total_words)%>%
+  kable_styling() %>%
+  scroll_box(width = "100%", height = "200px")
+
+
+#Using left join to create a compsite dataframe 
+track_words <- left_join(track_words, total_words)
+
+ggplot(track_words, aes(n/total, fill = track_n)) +
+  geom_histogram(show.legend = FALSE, bins = 100) +
+  scale_colour_brewer("Dark2") +
+  facet_wrap(~track_n, ncol = 2, scales = "free_y")
+```
+
+These plots show that more common words have higher frequencies and should be weighted less as in the indver document frequency approach.
+
+# TF-IDF
+
+## **Question Five:** <br>
+<center>
+**What are the words that are most important in each track on the album?**
+</center>
+
+<br>
+<br>
+Code in this section is modified from [Text Mining with R Section 3.3](https://www.tidytextmining.com/tfidf.html#the-bind_tf_idf-function)
+The inverse document frequency referrs to the weight of a particular word in a document therefore, penalizing words that appear more frequently than others (words that appear more frequently contrinbute less weight) . These two measurs are multiplied to calculate the **TF-IDF** which identifies the adjusted frequency of a particular word that appears in a collection of documents. We can do this in one shot using the piping functionality of `tidyverse`.
+
+<ol>
+<li> Call`bind_tf_idf()` on the composite dataframe created above. This will add columns with values for `tf`, `idf`, and `tf_idf`</li>
+<li> Arrange rows in descending order based on the value of `tf_idf`</li>
+<li> Group by `track_n`</li>
+<li> Convert the word column to factors with levels equal to the number of unique words</li>
+<li> Select the top 15 and plot bar charts to compare</li>
+</ol>
+
+```{r, message = FALSE, fig.height = 25}
+track_words %>%
+  bind_tf_idf(word, track_n, n)%>%
+  arrange(desc(tf_idf)) %>%
+  mutate(word = factor(word, levels = rev(unique(word)))) %>% 
+  group_by(track_n) %>% 
+  top_n(15) %>% 
+  ungroup() %>%
+  ggplot(aes(word, tf_idf, fill = track_n)) +
+  geom_col(show.legend = FALSE) +
+  labs(x = NULL, y = "tf-idf") +
+  facet_wrap(~track_n, ncol = 2, scales = "free") +
+  coord_flip() +
+  theme(text = element_text(size=7), axis.text.x = element_text(size = 2))
+```
+
+Now in future studies we can do an analysis of *important* words in this album or look into specific songs.
+
+# References
+
+<ul>
+<li>`nrc` lexicon: Saif M. Mohammad and Peter Turney. (2013), Crowdsourcing a Word-Emotion Association Lexicon.'' Computational Intelligence, 29(3): 436-465.</li>
+
+<li>[Genius tutorial](https://github.com/JosiahParry/genius)</li>
+
+<li>[Text Mining with R](https://www.tidytextmining.com/sentiment.html)</li>
+</ul>
