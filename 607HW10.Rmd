@@ -12,6 +12,7 @@ output:
 ---
 
 ```{r, echo = FALSE, include = FALSE, results = 'hide', warning = FALSE}
+library(RColorBrewer)
 library(tidyverse)
 library(genius)
 library(tidytext)
@@ -39,6 +40,7 @@ In order to classify the words that NF chooses to use in his album I chose the f
 <ul>
 <li>`nrc`: lexicon that classifies words and their associations with emotions (anger, fear, anticipation, trust, surprise, sadness, joy, and disgust) and two sentiments (negative and positive). </li>
 <li>`bing`: lexicon that classifies words as either associated with negative and positive sentiments</li>
+<li> `AFINN`: lexicon that classifies words as positive or negative within a scale of -5 to 5</li>
 </ul>
 
 The lyrics to NF's album *Perception* was accessed using the `genius` library which alloows us access to a corpus of lyrics by album, artist, song title, etc.
@@ -319,7 +321,48 @@ ggplot(aes(word, n, fill = sentiment)) +
 
 It is not surprising that the word that appears most in the album is "like". This also begs the question "How many of those 'likes' preceded negative words? Would those be considered negative.
 
-These are precisly the types of nuances that approaches such as n-grams and tf-idf try to address, 
+These are precisly the types of nuances that approaches such as n-grams and tf-idf try to address, `
+
+# Inner - Join with AFINN
+
+
+
+## **Question Five:** <br>
+<center>
+**How do the sentiments of each track compare?**
+</center>
+
+<br>
+<br>
+
+This question was answered using the `AFINN` lexicon's classification. 
+
+<ol>
+<li>Use `get_sentiments()` to call `afinn` lexicon and use `inner_join()` to analyze sentiment</li>
+
+<li>Use `groub_by()` to group by track</li>
+
+<li>Use `summarzie()` to find the sume of sentiment scores for each track </li>
+
+<li> Visualize using `ggplot` and `geom_col()` to create a bar chart</li>
+</ol>
+```{r, message = FALSE, , fig.align = "center"}
+nf_percep_afinn<- nf_percep_words %>%
+  inner_join(get_sentiments("afinn")) %>%
+  group_by(track_n) %>%
+  summarize(total = sum(value))
+  
+kable(nf_percep_afinn) %>%
+  kable_styling() %>%
+  scroll_box(width = "100%", height = "200px")
+
+ggplot(as.data.frame(nf_percep_afinn), aes(x = track_n, y = total, fill = track_n)) +
+  geom_col()  +
+  labs(title = "Track Sentiments", x="Track Number", y = "AFINN Score")+
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+Using this lexicon has allowed us to ranck the tracks from most positive to most negative. Here we have confirmation that NF's music uses more positive than negative words. In addition one can also argue that the organization of tracks was strategic with positive "vibes" in the beggining, then a decrease in positive sentiment, then he brings up the sentiment again at the end. This drastically affects the moods his listeners are exposed to while they listen to his album.
 
 # Wordmaps
 
@@ -391,7 +434,7 @@ These plots show that more common words have higher frequencies and should be we
 
 # TF-IDF
 
-## **Question Five:** <br>
+## **Question Six:** <br>
 <center>
 **What are the words that are most important in each track on the album?**
 </center>
